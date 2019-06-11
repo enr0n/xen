@@ -1,0 +1,20 @@
+---
+GENERATOR:
+    PackageName: libxl
+    PackageDescription: "Package libxl provides Go bindings for the Xen Project hypervisor's libxenlight (libxl)."
+    Includes:
+        - ../libxl/libxl.h
+    Options:
+        SafeStrings: true
+PARSER:
+    IncludePaths:
+        - /usr/include
+        - /usr/lib/gcc/x86_64-linux-gnu/8/include
+        - ../libxl
+        - ../libs/toollog/include
+    SourcesPaths:
+        - ../libxl/libxl.h
+TRANSLATOR:
+    Rules:
+        global:
+            - {action: accept, from: "^libxl_"}
