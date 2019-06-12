@@ -15,6 +15,16 @@ PARSER:
     SourcesPaths:
         - ../libxl/libxl.h
 TRANSLATOR:
+    ConstRules:
+        defines: expand
+        enum: cgo
     Rules:
         global:
             - {action: accept, from: "^libxl_"}
+        const:
+            - {action: accept, from: "^LIBXL_"}
+            - {transform: lower}
+        post-global:
+            - {action: replace, from: "libxl_"}
+            - {load: snakecase}
+            - {transform: export}
