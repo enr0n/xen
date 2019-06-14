@@ -6,4 +6,4 @@ all: generate
 
 .PHONY: generate
 generate:
-	c-for-go libxl.yml
+	c-for-go -ccincl libxl.yml
