@@ -3,7 +3,7 @@ GENERATOR:
     PackageName: libxl
     PackageDescription: "Package libxl provides Go bindings for the Xen Project hypervisor's libxenlight (libxl)."
     Includes:
-        - ../libxl/libxl.h
+        - libxl.h
     Options:
         SafeStrings: true
 PARSER:
@@ -14,12 +14,15 @@ PARSER:
         - ../libxl/libxl.h
 TRANSLATOR:
     ConstRules:
-        defines: expand
+        defines: cgo
         enum: cgo
     Rules:
         global:
             - {action: accept, from: "^libxl_"}
         const:
+            # Ignore LIBXL_EXTERNAL_CALLERS_ONLY - the translator does not know how
+            # to handle it, and it's semantics do not make sense in go.
+            - {action: ignore, from: "LIBXL_EXTERNAL_CALLERS_ONLY"}
             - {action: accept, from: "^LIBXL_"}
             - {transform: lower}
         post-global:
