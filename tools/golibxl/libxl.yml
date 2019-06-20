@@ -4,6 +4,8 @@ GENERATOR:
     PackageDescription: "Package libxl provides Go bindings for the Xen Project hypervisor's libxenlight (libxl)."
     Includes:
         - libxl.h
+    FlagGroups:
+        - {name: LDFLAGS, flags: [-lxenlight]}
     Options:
         SafeStrings: true
 PARSER:
