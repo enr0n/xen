@@ -11,3 +11,10 @@ generate:
 .PHONY: test
 test:
 	go test -v ./libxl -count=1
+
+.PHONY: check
+check: all test
+
+.PHONY: clean
+clean:
+	rm -f libxl/cgo_helpers* const.go types.go doc.go libxl.go

@@ -2,7 +2,7 @@
 GENERATOR:
     PackageName: libxl
     PackageDescription: "Package libxl provides Go bindings for the Xen Project hypervisor's libxenlight (libxl)."
-    Includes:
+    SysIncludes:
         - libxl.h
     FlagGroups:
         - {name: LDFLAGS, flags: [-lxenlight]}
@@ -18,16 +18,144 @@ TRANSLATOR:
     ConstRules:
         defines: cgo
         enum: cgo
+    TypeTips:
+        type:
+            - {target: "^uint32_t", self: plain}
+    MemTips:
+        - {target: "^xentoollog_logger", self: raw}
+        - {target: "^libxl_asyncop_how", self: raw}
+        - {target: "^libxl_asyncprogress_how", self: raw}
+        - {target: "^libxl_channel_connection", self: raw}
+        - {target: "^libxl_domain_create_info", self: raw}
+        - {target: "^libxl_domain_build_info", self: raw}
+        - {target: "^libxl_device_disk" ,self: raw}
+        - {target: "^libxl_device_nic" ,self: raw}
+        - {target: "^libxl_device_pci" ,self: raw}
+        - {target: "^libxl_device_rdm" ,self: raw}
+        - {target: "^libxl_device_dtdev" ,self: raw}
+        - {target: "^libxl_device_vfb" ,self: raw}
+        - {target: "^libxl_device_vkb" ,self: raw}
+        - {target: "^libxl_device_vtpm" ,self: raw}
+        - {target: "^libxl_device_vsnd" ,self: raw}
+        - {target: "^libxl_device_p9" ,self: raw}
+        - {target: "^libxl_device_vdispl" ,self: raw}
+        - {target: "^libxl_device_pvcallsif" ,self: raw}
+        - {target: "^libxl_device_channel" ,self: raw}
+        - {target: "^libxl_device_usbctrl" ,self: raw}
+        - {target: "^libxl_device_usbdev" ,self: raw}
+        - {target: "^libxl_domain_create_info" ,self: raw}
+        - {target: "^libxl_domain_build_info" ,self: raw}
+        - {target: "^libxl_domain_type" ,self: raw}
+        - {target: "^libxl_defbool" ,self: raw}
+        - {target: "^libxl_uuid" ,self: raw}
+        - {target: "^libxl_key_value_list" ,self: raw}
+
+    PtrTips:
+        function:
+            - {target: "^libxl_ctx_alloc$", tips: [sref, 0, 0, ref]}
+            - {target: "^libxl_ctx_free$", tips: [ref]}
+            - {target: "^libxl_domain_create_new", tips: [ref, ref, ref, ref, ref]}
+            - {target: "^libxl_domain_info", tips: [ref, ref, 0]}
+
+        struct:
+            - {target: "^libxl_domain_config", tips: [0,0,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,0,0,0,0]}
     Rules:
         global:
-            - {action: accept, from: "^libxl_"}
-        const:
-            # Ignore LIBXL_EXTERNAL_CALLERS_ONLY - the translator does not know how
-            # to handle it, and it's semantics do not make sense in go.
-            - {action: ignore, from: "LIBXL_EXTERNAL_CALLERS_ONLY"}
-            - {action: accept, from: "^LIBXL_"}
-            - {transform: lower}
-        post-global:
+            - {action: accept, from: "^libxl_ctx"} 
+            - {action: accept, from: "^xentoollog"}
+        function:
+            # Accept only those APIs that we want for now. Others can easily be added
+            # by adding an 'accept' rule here.
+            - {action: accept, from: "^libxl_domain_create_new"}
+            - {action: accept, from: "^libxl_domain_info"}
+            
+            - {action: replace, from: "libxl_"}
+            - {load: snakecase}
+            # TODO: These are things we want, but need to add piece by piece.
+            #- {action: accept, from: "^libxl_mac"}
+            #- {action: accept, from: "^libxl_domain"} 
+            #- {action: accept, from: "^libxl_uuid"}
+            #- {action: accept, from: "^libxl_vminfo"}
+            #- {action: accept, from: "^libxl_trigger"}
+            #- {action: accept, from: "^libxl_retrieve_domain_configuration"} 
+            #- {action: accept, from: "^libxl_list_domain"} 
+            #- {action: accept, from: "^libxl_list_vm"} 
+            #- {action: accept, from: "^libxl_list_cpupool"} 
+            #- {action: accept, from: "^libxl_device"}
+            #- {action: accept, from: "^libxl_cdrom_insert"}
+            #- {action: accept, from: "^libxl_send_trigger"}
+            #- {action: accept, from: "^libxl_dominfo"}
+            #- {action: accept, from: "^libxl_diskinfo"}
+            #- {action: accept, from: "^libxl_usbctrlinfo"}
+            #- {action: accept, from: "^libxl_nicinfo"}
+            #- {action: accept, from: "^libxl_channelinfo"}
+            #- {action: accept, from: "^libxl_vtpminfo"}
+            #- {action: accept, from: "^libxl_vdisplinfo"}
+            #- {action: accept, from: "^libxl_vsndinfo"}
+            #- {action: accept, from: "^libxl_vkbinfo"}
+            #- {action: accept, from: "^libxl_bitmap"}
+            #- {action: accept, from: "^libxl_cpupoolinfo"}
+            #- {action: accept, from: "^libxl_usbdev_type"}
+            #- {action: accept, from: "^libxl_channel_connection"}
+            #- {action: accept, from: "^libxl_asyncop_how"}
+            #- {action: accept, from: "^libxl_asyncprogress_how"}
+        type:
+            - {action: accept, from: "^libxl_action_on_shutdown"}
+            - {action: accept, from: "^libxl_asyncop_how"}
+            - {action: accept, from: "^libxl_asyncprogress_how"}
+            - {action: accept, from: "^libxl_channel_connection"}
+            - {action: accept, from: "^libxl_defbool"}
+            - {action: accept, from: "^libxl_device_channel"}
+            - {action: accept, from: "^libxl_device_disk"}
+            - {action: accept, from: "^libxl_device_dtdev"}
+            - {action: accept, from: "^libxl_device_nic"}
+            - {action: accept, from: "^libxl_device_p9"}
+            - {action: accept, from: "^libxl_device_pci"}
+            - {action: accept, from: "^libxl_device_pvcallsif"}
+            - {action: accept, from: "^libxl_device_rdm"}
+            - {action: accept, from: "^libxl_device_usbctrl"}
+            - {action: accept, from: "^libxl_device_usbdev"}
+            - {action: accept, from: "^libxl_device_vdispl"}
+            - {action: accept, from: "^libxl_device_vfb"}
+            - {action: accept, from: "^libxl_device_vkb"}
+            - {action: accept, from: "^libxl_device_vsnd"}
+            - {action: accept, from: "^libxl_device_vtpm"}
+            - {action: accept, from: "^libxl_devid"} 
+            - {action: accept, from: "^libxl_domain_build_info"}
+            - {action: accept, from: "^libxl_domain_config"}
+            - {action: accept, from: "^libxl_domain_create_info"}
+            - {action: accept, from: "^libxl_domain_type"}
+            - {action: accept, from: "^libxl_domid"} 
+            - {action: accept, from: "^libxl_dominfo"}
+            - {action: accept, from: "^libxl_key_value_list"}
+            - {action: accetp, from: "^libxl_shutdown_reason"}
+            - {action: accept, from: "^libxl_uuid"}
+            - {action: accept, from: "^uint32_t"}
+
             - {action: replace, from: "libxl_"}
             - {load: snakecase}
             - {transform: export}
+
+        const:
+            # Ignore LIBXL_EXTERNAL_CALLERS_ONLY - the translator does not know how
+            # to handle it, and it's semantics do not make sense in go.
+            #
+            # FIXME: Probably... don't need to accept all of these.
+            - {action: ignore, from: "LIBXL_EXTERNAL_CALLERS_ONLY"}
+            - {action: accept, from: "^LIBXL_"}
+
+            - {transform: lower}
+            - {action: replace, from: "libxl_"}
+            - {load: snakecase}
+            - {transform: export}
+        private:
+            - {transform: unexport}
+        post-global:
+            - {action: replace, from: "libxl_"}
+            - {load: snakecase}
+            - {action: replace, from: "Domid", to: "DomID"}
+            - {action: replace, from: "Devid", to: "DevID"}
+            - {action: replace, from: "Uuid", to: "UUID"}
+            - {action: replace, from: "Dominfo", to: "DomInfo"}
+            - {action: replace, from: "Cpu", to: "CPU"}
+            - {action: replace, from: "Vcpu", to: "VCPU"}
