@@ -57,3 +57,30 @@ func (c *Context) CreateDomain(config *DomainConfig) (DomID, error) {
 
 	return DomID(domid), nil
 }
+
+// ShutdownDomain shuts down a domain, specified by its domid.
+func (c *Context) ShutdownDomain(domid DomID) error {
+	if ret := domainShutdown(c.Ctx, uint32(domid)); ret != 0 {
+		return fmt.Errorf("unable to shutdown domain: %v", ret)
+	}
+
+	return nil
+}
+
+// RebootDomain reboots a domain, specified by its domid.
+func (c *Context) RebootDomain(domid DomID) error {
+	if ret := domainReboot(c.Ctx, uint32(domid)); ret != 0 {
+		return fmt.Errorf("unable to reboot domain: %v", ret)
+	}
+
+	return nil
+}
+
+// DestroyDomain destroys a domain, specified by its domid.
+func (c *Context) DestroyDomain(domid DomID) error {
+	if ret := domainDestroy(c.Ctx, uint32(domid), nil); ret != 0 {
+		return fmt.Errorf("unable to destroy domain: %v", ret)
+	}
+
+	return nil
+}

@@ -56,6 +56,9 @@ TRANSLATOR:
             - {target: "^libxl_ctx_free$", tips: [ref]}
             - {target: "^libxl_domain_create_new", tips: [ref, ref, ref, ref, ref]}
             - {target: "^libxl_domain_info", tips: [ref, ref, 0]}
+            - {target: "^libxl_domain_shutdown", tips: [ref,0]}
+            - {target: "^libxl_domain_reboot", tips: [ref,0]}
+            - {target: "^libxl_domain_destroy", tips: [ref,0, ref]}
 
         struct:
             - {target: "^libxl_domain_config", tips: [0,0,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,0,0,0,0]}
@@ -68,6 +71,9 @@ TRANSLATOR:
             # by adding an 'accept' rule here.
             - {action: accept, from: "^libxl_domain_create_new"}
             - {action: accept, from: "^libxl_domain_info"}
+            - {action: accept, from: "^libxl_domain_shutdown"}
+            - {action: accept, from: "^libxl_domain_reboot" }
+            - {action: accept, from: "^libxl_domain_destroy"}
             
             - {action: replace, from: "libxl_"}
             - {load: snakecase}
