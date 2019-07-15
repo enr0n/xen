@@ -5,7 +5,7 @@ GENERATOR:
     SysIncludes:
         - libxl.h
     FlagGroups:
-        - {name: LDFLAGS, flags: [-lxenlight]}
+        - {name: LDFLAGS, flags: ["-L${SRCDIR}/../libxl -lxenlight"]}
     Options:
         SafeStrings: true
 PARSER:
@@ -17,7 +17,7 @@ PARSER:
 TRANSLATOR:
     ConstRules:
         defines: cgo
-        enum: cgo
+        enum: expand
     TypeTips:
         type:
             - {target: "^uint32_t", self: plain}
@@ -64,7 +64,7 @@ TRANSLATOR:
             - {target: "^libxl_domain_config", tips: [0,0,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,0,0,0,0]}
     Rules:
         global:
-            - {action: accept, from: "^libxl_ctx"} 
+            - {action: accept, from: "^libxl_ctx"}
             - {action: accept, from: "^xentoollog"}
         function:
             # Accept only those APIs that we want for now. Others can easily be added
@@ -74,19 +74,19 @@ TRANSLATOR:
             - {action: accept, from: "^libxl_domain_shutdown"}
             - {action: accept, from: "^libxl_domain_reboot" }
             - {action: accept, from: "^libxl_domain_destroy"}
-            
+
             - {action: replace, from: "libxl_"}
             - {load: snakecase}
             # TODO: These are things we want, but need to add piece by piece.
             #- {action: accept, from: "^libxl_mac"}
-            #- {action: accept, from: "^libxl_domain"} 
+            #- {action: accept, from: "^libxl_domain"}
             #- {action: accept, from: "^libxl_uuid"}
             #- {action: accept, from: "^libxl_vminfo"}
             #- {action: accept, from: "^libxl_trigger"}
-            #- {action: accept, from: "^libxl_retrieve_domain_configuration"} 
-            #- {action: accept, from: "^libxl_list_domain"} 
-            #- {action: accept, from: "^libxl_list_vm"} 
-            #- {action: accept, from: "^libxl_list_cpupool"} 
+            #- {action: accept, from: "^libxl_retrieve_domain_configuration"}
+            #- {action: accept, from: "^libxl_list_domain"}
+            #- {action: accept, from: "^libxl_list_vm"}
+            #- {action: accept, from: "^libxl_list_cpupool"}
             #- {action: accept, from: "^libxl_device"}
             #- {action: accept, from: "^libxl_cdrom_insert"}
             #- {action: accept, from: "^libxl_send_trigger"}
@@ -126,21 +126,25 @@ TRANSLATOR:
             - {action: accept, from: "^libxl_device_vkb"}
             - {action: accept, from: "^libxl_device_vsnd"}
             - {action: accept, from: "^libxl_device_vtpm"}
-            - {action: accept, from: "^libxl_devid"} 
+            - {action: accept, from: "^libxl_devid"}
             - {action: accept, from: "^libxl_domain_build_info"}
             - {action: accept, from: "^libxl_domain_config"}
             - {action: accept, from: "^libxl_domain_create_info"}
             - {action: accept, from: "^libxl_domain_type"}
-            - {action: accept, from: "^libxl_domid"} 
+            - {action: accept, from: "^libxl_error"}
+            - {action: accept, from: "^libxl_domid"}
             - {action: accept, from: "^libxl_dominfo"}
             - {action: accept, from: "^libxl_key_value_list"}
             - {action: accetp, from: "^libxl_shutdown_reason"}
             - {action: accept, from: "^libxl_uuid"}
             - {action: accept, from: "^uint32_t"}
 
+            - {action: replace, from: "libxl_error", to: "xlError"}
             - {action: replace, from: "libxl_"}
+
             - {load: snakecase}
             - {transform: export}
+            - {transform: unexport, from: "XlError"}
 
         const:
             # Ignore LIBXL_EXTERNAL_CALLERS_ONLY - the translator does not know how
@@ -149,11 +153,12 @@ TRANSLATOR:
             # FIXME: Probably... don't need to accept all of these.
             - {action: ignore, from: "LIBXL_EXTERNAL_CALLERS_ONLY"}
             - {action: accept, from: "^LIBXL_"}
+            - {action: accept, from: "^ERROR_"}
 
             - {transform: lower}
             - {action: replace, from: "libxl_"}
+            - {action: replace, from: "ERROR_"}
             - {load: snakecase}
-            - {transform: export}
         private:
             - {transform: unexport}
         post-global:

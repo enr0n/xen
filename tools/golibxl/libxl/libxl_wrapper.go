@@ -15,7 +15,7 @@ func NewContext() (*Context, error) {
 		Ctx: NewCtx(),
 	}
 
-	if ret := ctxAlloc(&c.Ctx, Version, 0, nil); ret != 0 {
+	if ret := ctxAlloc(&c.Ctx, version, 0, nil); ret != 0 {
 		return nil, fmt.Errorf("unable to alloc new context: %v", ret)
 	}
 
@@ -39,8 +39,14 @@ func (c *Context) DomainInfo(domid DomID) (*DomInfo, error) {
 	if ret := domainInfo(c.Ctx, &di, uint32(domid)); ret != 0 {
 		return nil, fmt.Errorf("unable to retrieve domain info: %v", ret)
 	}
+	di.Deref()
 
 	return &di, nil
+}
+
+// DomainExists returns a bool indicating if the domain exists.
+func (c *Context) DomainExists(domid DomID) bool {
+	return domainInfo(c.Ctx, nil, uint32(domid)) != int32(errorDomainNotfound)
 }
 
 // CreateDomain creates a new domain with a given DomainConfig.
