@@ -90,3 +90,20 @@ func (c *Context) DestroyDomain(domid DomID) error {
 
 	return nil
 }
+
+// DomIDToName returns the name of a domain given its domid.
+func (c *Context) DomIDToName(domid DomID) string {
+	return domidToName(c.Ctx, uint32(domid))
+}
+
+// NameToDomID returns the domid of a domain given its name.
+func (c *Context) NameToDomID(name string) (DomID, error) {
+	// Begin with invalid domid
+	domid := ^uint32(0)
+
+	if ret := DomID(nameToDomID(c.Ctx, name, &domid)); ret != 0 {
+		return DomID(domid), fmt.Errorf("unable to convert name to domid: %v", ret)
+	}
+
+	return DomID(domid), nil
+}

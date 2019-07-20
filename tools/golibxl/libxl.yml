@@ -4,6 +4,7 @@ GENERATOR:
     PackageDescription: "Package libxl provides Go bindings for the Xen Project hypervisor's libxenlight (libxl)."
     SysIncludes:
         - libxl.h
+        - libxl_utils.h
     FlagGroups:
         - {name: LDFLAGS, flags: ["-L${SRCDIR}/../libxl -lxenlight"]}
     Options:
@@ -14,6 +15,7 @@ PARSER:
         - ../libs/toollog/include
     SourcesPaths:
         - ../libxl/libxl.h
+        - ../libxl/libxl_utils.h
 TRANSLATOR:
     ConstRules:
         defines: cgo
@@ -59,6 +61,8 @@ TRANSLATOR:
             - {target: "^libxl_domain_shutdown", tips: [ref,0]}
             - {target: "^libxl_domain_reboot", tips: [ref,0]}
             - {target: "^libxl_domain_destroy", tips: [ref,0, ref]}
+            - {target: "^libxl_domid_to_name", tips: [ref,0], self: arr}
+            - {target: "^libxl_name_to_domid", tips: [ref,ref,ref]}
 
         struct:
             - {target: "^libxl_domain_config", tips: [0,0,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,ref,0,0,0,0,0]}
@@ -74,6 +78,8 @@ TRANSLATOR:
             - {action: accept, from: "^libxl_domain_shutdown"}
             - {action: accept, from: "^libxl_domain_reboot" }
             - {action: accept, from: "^libxl_domain_destroy"}
+            - {action: accept, from: "^libxl_name_to_domid"}
+            - {action: accept, from: "^libxl_domid_to_name"}
 
             - {action: replace, from: "libxl_"}
             - {load: snakecase}
