@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2019 Nick Rosbrook, Assured Information Security, Inc.
  * Copyright (C) 2016 George W. Dunlap, Citrix Systems UK Ltd
  *
  * This library is free software; you can redistribute it and/or
@@ -14,6 +15,8 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
  */
+
+// Package xenlight provides bindings to libxenlight (libxl).
 package xenlight
 
 /*
@@ -33,385 +36,406 @@ import "C"
 
 import (
 	"fmt"
-	"time"
 	"unsafe"
 )
 
-/*
- * Errors
- */
-
-type Error int
-
-const (
-	ErrorNonspecific                  = Error(-C.ERROR_NONSPECIFIC)
-	ErrorVersion                      = Error(-C.ERROR_VERSION)
-	ErrorFail                         = Error(-C.ERROR_FAIL)
-	ErrorNi                           = Error(-C.ERROR_NI)
-	ErrorNomem                        = Error(-C.ERROR_NOMEM)
-	ErrorInval                        = Error(-C.ERROR_INVAL)
-	ErrorBadfail                      = Error(-C.ERROR_BADFAIL)
-	ErrorGuestTimedout                = Error(-C.ERROR_GUEST_TIMEDOUT)
-	ErrorTimedout                     = Error(-C.ERROR_TIMEDOUT)
-	ErrorNoparavirt                   = Error(-C.ERROR_NOPARAVIRT)
-	ErrorNotReady                     = Error(-C.ERROR_NOT_READY)
-	ErrorOseventRegFail               = Error(-C.ERROR_OSEVENT_REG_FAIL)
-	ErrorBufferfull                   = Error(-C.ERROR_BUFFERFULL)
-	ErrorUnknownChild                 = Error(-C.ERROR_UNKNOWN_CHILD)
-	ErrorLockFail                     = Error(-C.ERROR_LOCK_FAIL)
-	ErrorJsonConfigEmpty              = Error(-C.ERROR_JSON_CONFIG_EMPTY)
-	ErrorDeviceExists                 = Error(-C.ERROR_DEVICE_EXISTS)
-	ErrorCheckpointDevopsDoesNotMatch = Error(-C.ERROR_CHECKPOINT_DEVOPS_DOES_NOT_MATCH)
-	ErrorCheckpointDeviceNotSupported = Error(-C.ERROR_CHECKPOINT_DEVICE_NOT_SUPPORTED)
-	ErrorVnumaConfigInvalid           = Error(-C.ERROR_VNUMA_CONFIG_INVALID)
-	ErrorDomainNotfound               = Error(-C.ERROR_DOMAIN_NOTFOUND)
-	ErrorAborted                      = Error(-C.ERROR_ABORTED)
-	ErrorNotfound                     = Error(-C.ERROR_NOTFOUND)
-	ErrorDomainDestroyed              = Error(-C.ERROR_DOMAIN_DESTROYED)
-	ErrorFeatureRemoved               = Error(-C.ERROR_FEATURE_REMOVED)
-)
-
-var errors = [...]string{
-	ErrorNonspecific:                  "Non-specific error",
-	ErrorVersion:                      "Wrong version",
-	ErrorFail:                         "Failed",
-	ErrorNi:                           "Not Implemented",
-	ErrorNomem:                        "No memory",
-	ErrorInval:                        "Invalid argument",
-	ErrorBadfail:                      "Bad Fail",
-	ErrorGuestTimedout:                "Guest timed out",
-	ErrorTimedout:                     "Timed out",
-	ErrorNoparavirt:                   "No Paravirtualization",
-	ErrorNotReady:                     "Not ready",
-	ErrorOseventRegFail:               "OS event registration failed",
-	ErrorBufferfull:                   "Buffer full",
-	ErrorUnknownChild:                 "Unknown child",
-	ErrorLockFail:                     "Lock failed",
-	ErrorJsonConfigEmpty:              "JSON config empty",
-	ErrorDeviceExists:                 "Device exists",
-	ErrorCheckpointDevopsDoesNotMatch: "Checkpoint devops does not match",
-	ErrorCheckpointDeviceNotSupported: "Checkpoint device not supported",
-	ErrorVnumaConfigInvalid:           "VNUMA config invalid",
-	ErrorDomainNotfound:               "Domain not found",
-	ErrorAborted:                      "Aborted",
-	ErrorNotfound:                     "Not found",
-	ErrorDomainDestroyed:              "Domain destroyed",
-	ErrorFeatureRemoved:               "Feature removed",
+var libxlErrors = [...]string{
+	-ErrorNonspecific:                  "Non-specific error",
+	-ErrorVersion:                      "Wrong version",
+	-ErrorFail:                         "Failed",
+	-ErrorNi:                           "Not Implemented",
+	-ErrorNomem:                        "No memory",
+	-ErrorInval:                        "Invalid argument",
+	-ErrorBadfail:                      "Bad Fail",
+	-ErrorGuestTimedout:                "Guest timed out",
+	-ErrorTimedout:                     "Timed out",
+	-ErrorNoparavirt:                   "No Paravirtualization",
+	-ErrorNotReady:                     "Not ready",
+	-ErrorOseventRegFail:               "OS event registration failed",
+	-ErrorBufferfull:                   "Buffer full",
+	-ErrorUnknownChild:                 "Unknown child",
+	-ErrorLockFail:                     "Lock failed",
+	-ErrorJsonConfigEmpty:              "JSON config empty",
+	-ErrorDeviceExists:                 "Device exists",
+	-ErrorCheckpointDevopsDoesNotMatch: "Checkpoint devops does not match",
+	-ErrorCheckpointDeviceNotSupported: "Checkpoint device not supported",
+	-ErrorVnumaConfigInvalid:           "VNUMA config invalid",
+	-ErrorDomainNotfound:               "Domain not found",
+	-ErrorAborted:                      "Aborted",
+	-ErrorNotfound:                     "Not found",
+	-ErrorDomainDestroyed:              "Domain destroyed",
+	-ErrorFeatureRemoved:               "Feature removed",
 }
 
 func (e Error) Error() string {
-	if 0 < int(e) && int(e) < len(errors) {
-		s := errors[e]
+	if 0 < int(e) && int(e) < len(libxlErrors) {
+		s := libxlErrors[e]
 		if s != "" {
 			return s
 		}
 	}
 	return fmt.Sprintf("libxl error: %d", -e)
-
 }
 
 /*
  * Types: Builtins
  */
 
+// Domid is a domain ID.
 type Domid uint32
 
-type MemKB uint64
+// Devid is a device ID.
+type Devid int
 
-type Uuid C.libxl_uuid
+// Uuid is a domain UUID.
+type Uuid [16]byte
 
-type Context struct {
-	ctx    *C.libxl_ctx
-	logger *C.xentoollog_logger_stdiostream
+// String formats a Uuid in the form "xxxx-xx-xx-xx-xxxxxx".
+func (u Uuid) String() string {
+	s := "%x%x%x%x-%x%x-%x%x-%x%x-%x%x%x%x%x%x"
+	opts := make([]interface{}, 16)
+
+	for i, v := range u {
+		opts[i] = v
+	}
+
+	return fmt.Sprintf(s, opts...)
 }
 
-type Hwcap []C.uint32_t
+func (u *Uuid) fromC(c *C.libxl_uuid) error {
+	b := (*[16]C.uint8_t)(unsafe.Pointer(&c.uuid[0]))
 
-func (chwcap C.libxl_hwcap) toGo() (ghwcap Hwcap) {
-	// Alloc a Go slice for the bytes
-	size := 8
-	ghwcap = make([]C.uint32_t, size)
+	for i, v := range b {
+		u[i] = byte(v)
+	}
 
+	return nil
+}
+
+func (u *Uuid) toC() (C.libxl_uuid, error) {
+	var c C.libxl_uuid
+
+	for i, v := range u {
+		c.uuid[i] = C.uint8_t(v)
+	}
+
+	return c, nil
+}
+
+// Hwcap represents a libxl_hwcap.
+type Hwcap [8]uint32
+
+func (hwcap *Hwcap) fromC(chwcap *C.libxl_hwcap) error {
 	// Make a slice pointing to the C array
-	mapslice := (*[1 << 30]C.uint32_t)(unsafe.Pointer(&chwcap[0]))[:size:size]
+	mapslice := (*[8]C.uint32_t)(unsafe.Pointer(chwcap))
 
 	// And copy the C array into the Go array
-	copy(ghwcap, mapslice)
+	for i, v := range mapslice {
+		hwcap[i] = uint32(v)
+	}
 
-	return
+	return nil
 }
 
-// typedef struct {
-//     uint32_t size;          /* number of bytes in map */
-//     uint8_t *map;
-// } libxl_bitmap;
+func (hwcap *Hwcap) toC() (C.libxl_hwcap, error) {
+	var chwcap C.libxl_hwcap
 
+	for i, v := range hwcap {
+		chwcap[i] = C.uint32_t(v)
+	}
+
+	return chwcap, nil
+}
+
+// Defbool represents a libxl_defbool.
+type Defbool struct {
+	val int
+}
+
+func (d *Defbool) fromC(c *C.libxl_defbool) error {
+	d.val = int(c.val)
+	return nil
+}
+
+func (d *Defbool) toC() (C.libxl_defbool, error) {
+	c := C.libxl_defbool{val: C.int(d.val)}
+	return c, nil
+}
+
+// KeyValueList represents a libxl_key_value_list.
+type KeyValueList map[string]string
+
+func (kvl KeyValueList) fromC(ckvl *C.libxl_key_value_list) error {
+	size := int(C.libxl_key_value_list_length(ckvl))
+	list := (*[1 << 30]*C.char)(unsafe.Pointer(ckvl))[:size:size]
+
+	for i := 0; i < size*2; i += 2 {
+		kvl[C.GoString(list[i])] = C.GoString(list[i+1])
+	}
+
+	return nil
+}
+
+func (kvl KeyValueList) toC() (C.libxl_key_value_list, error) {
+	// Add extra slot for sentinel
+	var char *C.char
+	csize := 2*len(kvl) + 1
+	ckvl := (C.libxl_key_value_list)(C.malloc(C.ulong(csize) * C.ulong(unsafe.Sizeof(char))))
+	clist := (*[1 << 31]*C.char)(unsafe.Pointer(ckvl))[:csize:csize]
+
+	i := 0
+	for k, v := range kvl {
+		clist[i] = C.CString(k)
+		clist[i+1] = C.CString(v)
+		i += 2
+	}
+	clist[len(clist)-1] = nil
+
+	return ckvl, nil
+}
+
+// StringList represents a libxl_string_list.
+type StringList []string
+
+func (sl StringList) fromC(csl *C.libxl_string_list) error {
+	size := int(C.libxl_string_list_length(csl))
+	list := (*[1 << 30]*C.char)(unsafe.Pointer(csl))[:size:size]
+
+	sl = make([]string, size)
+
+	for i, v := range list {
+		sl[i] = C.GoString(v)
+	}
+
+	return nil
+}
+
+func (sl StringList) toC() (C.libxl_string_list, error) {
+	var char *C.char
+	size := len(sl)
+	csl := (C.libxl_string_list)(C.malloc(C.ulong(size) * C.ulong(unsafe.Sizeof(char))))
+	clist := (*[1 << 30]*C.char)(unsafe.Pointer(csl))[:size:size]
+
+	for i, v := range sl {
+		clist[i] = C.CString(v)
+	}
+
+	return csl, nil
+}
+
+// CpuidPolicyList represents a libxl_cpuid_policy_list.
+type CpuidPolicyList struct {
+	val *C.libxl_cpuid_policy_list
+}
+
+func (cpl *CpuidPolicyList) fromC(ccpl *C.libxl_cpuid_policy_list) error {
+	cpl.val = ccpl
+	return nil
+}
+
+func (cpl *CpuidPolicyList) toC() (C.libxl_cpuid_policy_list, error) {
+	if cpl.val == nil {
+		var c C.libxl_cpuid_policy_list
+		return c, nil
+	}
+
+	ccpl := (*C.libxl_cpuid_policy_list)(unsafe.Pointer(cpl.val))
+	return *ccpl, nil
+}
+
+// MsVmGenid represents a libxl_ms_vm_genid.
+type MsVmGenid [int(C.LIBXL_MS_VM_GENID_LEN)]byte
+
+func (mvg *MsVmGenid) fromC(cmvg *C.libxl_ms_vm_genid) error {
+	b := (*[int(C.LIBXL_MS_VM_GENID_LEN)]C.uint8_t)(unsafe.Pointer(&cmvg.bytes[0]))
+
+	for i, v := range b {
+		mvg[i] = byte(v)
+	}
+
+	return nil
+}
+
+func (mvg *MsVmGenid) toC() (C.libxl_ms_vm_genid, error) {
+	var cmvg C.libxl_ms_vm_genid
+
+	for i, v := range mvg {
+		cmvg.bytes[i] = C.uint8_t(v)
+	}
+
+	return cmvg, nil
+}
+
+// Mac represents a libxl_mac, or simply a MAC address.
+type Mac [6]byte
+
+// String formats a Mac address to string representation.
+func (mac Mac) String() string {
+	s := "%x:%x:%x:%x:%x:%x"
+	opts := make([]interface{}, 6)
+
+	for i, v := range mac {
+		opts[i] = v
+	}
+
+	return fmt.Sprintf(s, opts...)
+}
+
+func (mac *Mac) fromC(cmac *C.libxl_mac) error {
+	b := (*[6]C.uint8_t)(unsafe.Pointer(cmac))
+
+	for i, v := range b {
+		mac[i] = byte(v)
+	}
+
+	return nil
+}
+
+func (mac *Mac) toC() (C.libxl_mac, error) {
+	var cmac C.libxl_mac
+
+	for i, v := range mac {
+		cmac[i] = C.uint8_t(v)
+	}
+
+	return cmac, nil
+}
+
+// EvLink represents a libxl_ev_link.
+//
+// Represented as an empty struct for now, as there is no
+// apparent need for the internals of this type to be exposed
+// through the Go package.
+type EvLink struct{}
+
+func (el *EvLink) fromC(cel *C.libxl_ev_link) error      { return nil }
+func (el *EvLink) toC() (cel C.libxl_ev_link, err error) { return }
+
+// Bitmap represents a libxl_bitmap.
+//
 // Implement the Go bitmap type such that the underlying data can
 // easily be copied in and out.  NB that we still have to do copies
 // both directions, because cgo runtime restrictions forbid passing to
 // a C function a pointer to a Go-allocated structure which contains a
 // pointer.
 type Bitmap struct {
+	// typedef struct {
+	//     uint32_t size;          /* number of bytes in map */
+	//     uint8_t *map;
+	// } libxl_bitmap;
 	bitmap []C.uint8_t
 }
 
-/*
- * Types: IDL
- *
- * FIXME: Generate these automatically from the IDL
- */
+func (bm *Bitmap) fromC(cbm *C.libxl_bitmap) error {
+	// Alloc a Go slice for the bytes
+	size := int(cbm.size)
+	bm.bitmap = make([]C.uint8_t, size)
 
-type Physinfo struct {
-	ThreadsPerCore    uint32
-	CoresPerSocket    uint32
-	MaxCpuId          uint32
-	NrCpus            uint32
-	CpuKhz            uint32
-	TotalPages        uint64
-	FreePages         uint64
-	ScrubPages        uint64
-	OutstandingPages  uint64
-	SharingFreedPages uint64
-	SharingUsedFrames uint64
-	NrNodes           uint32
-	HwCap             Hwcap
-	CapHvm            bool
-	CapHvmDirectio    bool
+	// Make a slice pointing to the C array
+	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
+
+	// And copy the C array into the Go array
+	copy(bm.bitmap, mapslice)
+
+	return nil
 }
 
-func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
+func (bm *Bitmap) toC() (C.libxl_bitmap, error) {
+	var cbm C.libxl_bitmap
 
-	physinfo = &Physinfo{}
-	physinfo.ThreadsPerCore = uint32(cphys.threads_per_core)
-	physinfo.CoresPerSocket = uint32(cphys.cores_per_socket)
-	physinfo.MaxCpuId = uint32(cphys.max_cpu_id)
-	physinfo.NrCpus = uint32(cphys.nr_cpus)
-	physinfo.CpuKhz = uint32(cphys.cpu_khz)
-	physinfo.TotalPages = uint64(cphys.total_pages)
-	physinfo.FreePages = uint64(cphys.free_pages)
-	physinfo.ScrubPages = uint64(cphys.scrub_pages)
-	physinfo.ScrubPages = uint64(cphys.scrub_pages)
-	physinfo.SharingFreedPages = uint64(cphys.sharing_freed_pages)
-	physinfo.SharingUsedFrames = uint64(cphys.sharing_used_frames)
-	physinfo.NrNodes = uint32(cphys.nr_nodes)
-	physinfo.HwCap = cphys.hw_cap.toGo()
-	physinfo.CapHvm = bool(cphys.cap_hvm)
-	physinfo.CapHvmDirectio = bool(cphys.cap_hvm_directio)
+	size := len(bm.bitmap)
+	cbm.size = C.uint32_t(size)
+	cbm._map = (*C.uint8_t)(C.malloc(C.ulong(cbm.size) * C.sizeof_uint8_t))
+	cslice := (*[1 << 31]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
 
-	return
+	copy(cslice, bm.bitmap)
+
+	return cbm, nil
 }
 
-type VersionInfo struct {
-	XenVersionMajor int
-	XenVersionMinor int
-	XenVersionExtra string
-	Compiler        string
-	CompileBy       string
-	CompileDomain   string
-	CompileDate     string
-	Capabilities    string
-	Changeset       string
-	VirtStart       uint64
-	Pagesize        int
-	Commandline     string
-	BuildId         string
+// Context represents a libxl_ctx.
+type Context struct {
+	ctx    *C.libxl_ctx
+	logger *C.xentoollog_logger_stdiostream
 }
 
-func (cinfo *C.libxl_version_info) toGo() (info *VersionInfo) {
-	info = &VersionInfo{}
-	info.XenVersionMajor = int(cinfo.xen_version_major)
-	info.XenVersionMinor = int(cinfo.xen_version_minor)
-	info.XenVersionExtra = C.GoString(cinfo.xen_version_extra)
-	info.Compiler = C.GoString(cinfo.compiler)
-	info.CompileBy = C.GoString(cinfo.compile_by)
-	info.CompileDomain = C.GoString(cinfo.compile_domain)
-	info.CompileDate = C.GoString(cinfo.compile_date)
-	info.Capabilities = C.GoString(cinfo.capabilities)
-	info.Changeset = C.GoString(cinfo.changeset)
-	info.VirtStart = uint64(cinfo.virt_start)
-	info.Pagesize = int(cinfo.pagesize)
-	info.Commandline = C.GoString(cinfo.commandline)
-	info.BuildId = C.GoString(cinfo.build_id)
+// NewContext returns a new Context.
+func NewContext() (*Context, error) {
+	var ctx Context
 
-	return
-}
+	ctx.logger = C.xtl_createlogger_stdiostream(C.stderr, C.XTL_ERROR, 0)
 
-type ShutdownReason int32
-
-const (
-	ShutdownReasonUnknown   = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_UNKNOWN)
-	ShutdownReasonPoweroff  = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_POWEROFF)
-	ShutdownReasonReboot    = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_REBOOT)
-	ShutdownReasonSuspend   = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_SUSPEND)
-	ShutdownReasonCrash     = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_CRASH)
-	ShutdownReasonWatchdog  = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_WATCHDOG)
-	ShutdownReasonSoftReset = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_SOFT_RESET)
-)
-
-func (sr ShutdownReason) String() (str string) {
-	cstr := C.libxl_shutdown_reason_to_string(C.libxl_shutdown_reason(sr))
-	str = C.GoString(cstr)
-
-	return
-}
-
-type DomainType int32
-
-const (
-	DomainTypeInvalid = DomainType(C.LIBXL_DOMAIN_TYPE_INVALID)
-	DomainTypeHvm     = DomainType(C.LIBXL_DOMAIN_TYPE_HVM)
-	DomainTypePv      = DomainType(C.LIBXL_DOMAIN_TYPE_PV)
-)
-
-func (dt DomainType) String() (str string) {
-	cstr := C.libxl_domain_type_to_string(C.libxl_domain_type(dt))
-	str = C.GoString(cstr)
-
-	return
-}
-
-type Dominfo struct {
-	Uuid      Uuid
-	Domid     Domid
-	Ssidref   uint32
-	SsidLabel string
-	Running   bool
-	Blocked   bool
-	Paused    bool
-	Shutdown  bool
-	Dying     bool
-	NeverStop bool
-
-	ShutdownReason   int32
-	OutstandingMemkb MemKB
-	CurrentMemkb     MemKB
-	SharedMemkb      MemKB
-	PagedMemkb       MemKB
-	MaxMemkb         MemKB
-	CpuTime          time.Duration
-	VcpuMaxId        uint32
-	VcpuOnline       uint32
-	Cpupool          uint32
-	DomainType       int32
-}
-
-func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
-
-	di = &Dominfo{}
-	di.Uuid = Uuid(cdi.uuid)
-	di.Domid = Domid(cdi.domid)
-	di.Ssidref = uint32(cdi.ssidref)
-	di.SsidLabel = C.GoString(cdi.ssid_label)
-	di.Running = bool(cdi.running)
-	di.Blocked = bool(cdi.blocked)
-	di.Paused = bool(cdi.paused)
-	di.Shutdown = bool(cdi.shutdown)
-	di.Dying = bool(cdi.dying)
-	di.NeverStop = bool(cdi.never_stop)
-	di.ShutdownReason = int32(cdi.shutdown_reason)
-	di.OutstandingMemkb = MemKB(cdi.outstanding_memkb)
-	di.CurrentMemkb = MemKB(cdi.current_memkb)
-	di.SharedMemkb = MemKB(cdi.shared_memkb)
-	di.PagedMemkb = MemKB(cdi.paged_memkb)
-	di.MaxMemkb = MemKB(cdi.max_memkb)
-	di.CpuTime = time.Duration(cdi.cpu_time)
-	di.VcpuMaxId = uint32(cdi.vcpu_max_id)
-	di.VcpuOnline = uint32(cdi.vcpu_online)
-	di.Cpupool = uint32(cdi.cpupool)
-	di.DomainType = int32(cdi.domain_type)
-
-	return
-}
-
-// # Consistent with values defined in domctl.h
-// # Except unknown which we have made up
-// libxl_scheduler = Enumeration("scheduler", [
-//     (0, "unknown"),
-//     (4, "sedf"),
-//     (5, "credit"),
-//     (6, "credit2"),
-//     (7, "arinc653"),
-//     (8, "rtds"),
-//     ])
-type Scheduler int
-
-var (
-	SchedulerUnknown  Scheduler = C.LIBXL_SCHEDULER_UNKNOWN
-	SchedulerSedf     Scheduler = C.LIBXL_SCHEDULER_SEDF
-	SchedulerCredit   Scheduler = C.LIBXL_SCHEDULER_CREDIT
-	SchedulerCredit2  Scheduler = C.LIBXL_SCHEDULER_CREDIT2
-	SchedulerArinc653 Scheduler = C.LIBXL_SCHEDULER_ARINC653
-	SchedulerRTDS     Scheduler = C.LIBXL_SCHEDULER_RTDS
-)
-
-// const char *libxl_scheduler_to_string(libxl_scheduler p);
-func (s Scheduler) String() string {
-	cs := C.libxl_scheduler_to_string(C.libxl_scheduler(s))
-	// No need to free const return value
-
-	return C.GoString(cs)
-}
-
-// int libxl_scheduler_from_string(const char *s, libxl_scheduler *e);
-func (s *Scheduler) FromString(gstr string) (err error) {
-	*s, err = SchedulerFromString(gstr)
-	return
-}
-
-func SchedulerFromString(name string) (s Scheduler, err error) {
-	cname := C.CString(name)
-	defer C.free(unsafe.Pointer(cname))
-
-	var cs C.libxl_scheduler
-
-	ret := C.libxl_scheduler_from_string(cname, &cs)
+	ret := C.libxl_ctx_alloc(&ctx.ctx, C.LIBXL_VERSION, 0, (*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
 	if ret != 0 {
-		err = Error(-ret)
-		return
+		return nil, Error(ret)
 	}
 
-	s = Scheduler(cs)
-
-	return
+	return &ctx, nil
 }
 
-// libxl_cpupoolinfo = Struct("cpupoolinfo", [
-//     ("poolid",      uint32),
-//     ("pool_name",   string),
-//     ("sched",       libxl_scheduler),
-//     ("n_dom",       uint32),
-//     ("cpumap",      libxl_bitmap)
-//     ], dir=DIR_OUT)
+// Close closes the Context.
+func (ctx *Context) Close() error {
+	ret := C.libxl_ctx_free(ctx.ctx)
+	ctx.ctx = nil
+	C.xtl_logger_destroy((*C.xentoollog_logger)(unsafe.Pointer(ctx.logger)))
 
-type CpupoolInfo struct {
-	Poolid      uint32
-	PoolName    string
-	Scheduler   Scheduler
-	DomainCount int
-	Cpumap      Bitmap
+	if ret != 0 {
+		return Error(ret)
+	}
+
+	return nil
 }
 
-func (cci C.libxl_cpupoolinfo) toGo() (gci CpupoolInfo) {
-	gci.Poolid = uint32(cci.poolid)
-	gci.PoolName = C.GoString(cci.pool_name)
-	gci.Scheduler = Scheduler(cci.sched)
-	gci.DomainCount = int(cci.n_dom)
-	gci.Cpumap = cci.cpumap.toGo()
+// DomainInfo returns the domain info for a domain, given its Domid.
+func (ctx *Context) DomainInfo(domid Domid) (*Dominfo, error) {
+	var (
+		di  Dominfo
+		cdi C.libxl_dominfo
+	)
+	C.libxl_dominfo_init(&cdi)
+	defer C.libxl_dominfo_dispose(&cdi)
 
-	return
+	ret := C.libxl_domain_info(ctx.ctx, &cdi, C.uint32_t(domid))
+	if ret != 0 {
+		return nil, Error(ret)
+	}
+
+	if err := di.fromC(&cdi); err != nil {
+		return nil, err
+	}
+
+	return &di, nil
+}
+
+// CreateDomain creates a domain with the given DomainConfig. On success, the
+// Domid of the new domain is returned.
+func (ctx *Context) CreateDomain(cfg DomainConfig) (Domid, error) {
+	domid := Domid(^uint32(0))
+
+	cdc, err := cfg.toC()
+	if err != nil {
+		return domid, err
+	}
+	defer C.libxl_domain_config_dispose(&cdc)
+
+	var cdomid C.uint32_t
+
+	// Do the domain creation synchronously.
+	ret := C.libxl_domain_create_new(ctx.ctx, &cdc, &cdomid, nil, nil)
+	if ret != 0 {
+		return domid, Error(-ret)
+	}
+	domid = Domid(cdomid)
+
+	return domid, nil
 }
 
 // libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool_out);
 // void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nb_pool);
-func (Ctx *Context) ListCpupool() (list []CpupoolInfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) ListCpupool() (list []Cpupoolinfo, err error) {
 	var nbPool C.int
 
-	c_cpupool_list := C.libxl_list_cpupool(Ctx.ctx, &nbPool)
+	c_cpupool_list := C.libxl_list_cpupool(ctx.ctx, &nbPool)
 
 	defer C.libxl_cpupoolinfo_list_free(c_cpupool_list, nbPool)
 
@@ -422,30 +446,33 @@ func (Ctx *Context) ListCpupool() (list []CpupoolInfo) {
 	// Magic
 	cpupoolListSlice := (*[1 << 30]C.libxl_cpupoolinfo)(unsafe.Pointer(c_cpupool_list))[:nbPool:nbPool]
 	for i := range cpupoolListSlice {
-		info := cpupoolListSlice[i].toGo()
-		list = append(list, info)
+		var ci Cpupoolinfo
+		err = ci.fromC(&cpupoolListSlice[i])
+		if err != nil {
+			return
+		}
+		list = append(list, ci)
 	}
 
 	return
 }
 
 // int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
-func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool CpupoolInfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) Cpupoolinfo(Poolid uint32) (pool Cpupoolinfo, err error) {
 	var c_cpupool C.libxl_cpupoolinfo
 
-	ret := C.libxl_cpupool_info(Ctx.ctx, &c_cpupool, C.uint32_t(Poolid))
+	ret := C.libxl_cpupool_info(ctx.ctx, &c_cpupool, C.uint32_t(Poolid))
 	if ret != 0 {
 		err = Error(-ret)
 		return
 	}
 	defer C.libxl_cpupoolinfo_dispose(&c_cpupool)
 
-	pool = c_cpupool.toGo()
+	err = pool.fromC(&c_cpupool)
+	if err != nil {
+		err = Error(-ret)
+		return
+	}
 
 	return
 }
@@ -456,12 +483,7 @@ func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool CpupoolInfo) {
 //                          uint32_t *poolid);
 // FIXME: uuid
 // FIXME: Setting poolid
-func (Ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitmap) (err error, Poolid uint32) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitmap) (err error, Poolid uint32) {
 	poolid := C.uint32_t(C.LIBXL_CPUPOOL_POOLID_ANY)
 	name := C.CString(Name)
 	defer C.free(unsafe.Pointer(name))
@@ -470,10 +492,13 @@ func (Ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitma
 	var uuid C.libxl_uuid
 	C.libxl_uuid_generate(&uuid)
 
-	cbm := Cpumap.toC()
+	cbm, err := Cpumap.toC()
+	if err != nil {
+		return
+	}
 	defer C.libxl_bitmap_dispose(&cbm)
 
-	ret := C.libxl_cpupool_create(Ctx.ctx, name, C.libxl_scheduler(Scheduler),
+	ret := C.libxl_cpupool_create(ctx.ctx, name, C.libxl_scheduler(Scheduler),
 		cbm, &uuid, &poolid)
 	if ret != 0 {
 		err = Error(-ret)
@@ -486,13 +511,8 @@ func (Ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitma
 }
 
 // int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
-func (Ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_cpupool_destroy(Ctx.ctx, C.uint32_t(Poolid))
+func (ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
+	ret := C.libxl_cpupool_destroy(ctx.ctx, C.uint32_t(Poolid))
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -502,13 +522,8 @@ func (Ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
 }
 
 // int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
-func (Ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_cpupool_cpuadd(Ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
+func (ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
+	ret := C.libxl_cpupool_cpuadd(ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -519,16 +534,14 @@ func (Ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
 
 // int libxl_cpupool_cpuadd_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                 const libxl_bitmap *cpumap);
-func (Ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
-	err = Ctx.CheckOpen()
+func (ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
+	cbm, err := Cpumap.toC()
 	if err != nil {
 		return
 	}
-
-	cbm := Cpumap.toC()
 	defer C.libxl_bitmap_dispose(&cbm)
 
-	ret := C.libxl_cpupool_cpuadd_cpumap(Ctx.ctx, C.uint32_t(Poolid), &cbm)
+	ret := C.libxl_cpupool_cpuadd_cpumap(ctx.ctx, C.uint32_t(Poolid), &cbm)
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -538,13 +551,8 @@ func (Ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error
 }
 
 // int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
-func (Ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_cpupool_cpuremove(Ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
+func (ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
+	ret := C.libxl_cpupool_cpuremove(ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -555,16 +563,14 @@ func (Ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
 
 // int libxl_cpupool_cpuremove_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                    const libxl_bitmap *cpumap);
-func (Ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
-	err = Ctx.CheckOpen()
+func (ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
+	cbm, err := Cpumap.toC()
 	if err != nil {
 		return
 	}
-
-	cbm := Cpumap.toC()
 	defer C.libxl_bitmap_dispose(&cbm)
 
-	ret := C.libxl_cpupool_cpuremove_cpumap(Ctx.ctx, C.uint32_t(Poolid), &cbm)
+	ret := C.libxl_cpupool_cpuremove_cpumap(ctx.ctx, C.uint32_t(Poolid), &cbm)
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -574,16 +580,11 @@ func (Ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err er
 }
 
 // int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid);
-func (Ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
 	name := C.CString(Name)
 	defer C.free(unsafe.Pointer(name))
 
-	ret := C.libxl_cpupool_rename(Ctx.ctx, name, C.uint32_t(Poolid))
+	ret := C.libxl_cpupool_rename(ctx.ctx, name, C.uint32_t(Poolid))
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -593,15 +594,10 @@ func (Ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
 }
 
 // int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
-func (Ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err error) {
 	ccpus := C.int(0)
 
-	ret := C.libxl_cpupool_cpuadd_node(Ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
+	ret := C.libxl_cpupool_cpuadd_node(ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -613,15 +609,10 @@ func (Ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err er
 }
 
 // int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
-func (Ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err error) {
 	ccpus := C.int(0)
 
-	ret := C.libxl_cpupool_cpuremove_node(Ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
+	ret := C.libxl_cpupool_cpuremove_node(ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -633,13 +624,8 @@ func (Ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err
 }
 
 // int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
-func (Ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_cpupool_movedomain(Ctx.ctx, C.uint32_t(Poolid), C.uint32_t(Id))
+func (ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
+	ret := C.libxl_cpupool_movedomain(ctx.ctx, C.uint32_t(Poolid), C.uint32_t(Id))
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -651,8 +637,11 @@ func (Ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
 //
 // Utility functions
 //
-func (Ctx *Context) CpupoolFindByName(name string) (info CpupoolInfo, found bool) {
-	plist := Ctx.ListCpupool()
+func (ctx *Context) CpupoolFindByName(name string) (info Cpupoolinfo, found bool) {
+	plist, err := ctx.ListCpupool()
+	if err != nil {
+		return
+	}
 
 	for i := range plist {
 		if plist[i].PoolName == name {
@@ -664,14 +653,17 @@ func (Ctx *Context) CpupoolFindByName(name string) (info CpupoolInfo, found bool
 	return
 }
 
-func (Ctx *Context) CpupoolMakeFree(Cpumap Bitmap) (err error) {
-	plist := Ctx.ListCpupool()
+func (ctx *Context) CpupoolMakeFree(Cpumap Bitmap) (err error) {
+	plist, err := ctx.ListCpupool()
+	if err != nil {
+		return
+	}
 
 	for i := range plist {
 		var Intersection Bitmap
 		Intersection = Cpumap.And(plist[i].Cpumap)
 		if !Intersection.IsEmpty() {
-			err = Ctx.CpupoolCpuremoveCpumap(plist[i].Poolid, Intersection)
+			err = ctx.CpupoolCpuremoveCpumap(plist[i].Poolid, Intersection)
 			if err != nil {
 				return
 			}
@@ -683,42 +675,6 @@ func (Ctx *Context) CpupoolMakeFree(Cpumap Bitmap) (err error) {
 /*
  * Bitmap operations
  */
-
-// Return a Go bitmap which is a copy of the referred C bitmap.
-func (cbm C.libxl_bitmap) toGo() (gbm Bitmap) {
-	// Alloc a Go slice for the bytes
-	size := int(cbm.size)
-	gbm.bitmap = make([]C.uint8_t, size)
-
-	// Make a slice pointing to the C array
-	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
-
-	// And copy the C array into the Go array
-	copy(gbm.bitmap, mapslice)
-
-	return
-}
-
-// Must be C.libxl_bitmap_dispose'd of afterwards
-func (gbm Bitmap) toC() (cbm C.libxl_bitmap) {
-	C.libxl_bitmap_init(&cbm)
-
-	size := len(gbm.bitmap)
-	cbm._map = (*C.uint8_t)(C.malloc(C.size_t(size)))
-	cbm.size = C.uint32_t(size)
-	if cbm._map == nil {
-		panic("C.calloc failed!")
-	}
-
-	// Make a slice pointing to the C array
-	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
-
-	// And copy the Go array into the C array
-	copy(mapslice, gbm.bitmap)
-
-	return
-}
-
 func (bm *Bitmap) Test(bit int) bool {
 	ubit := uint(bit)
 	if bit > bm.Max() || bm.bitmap == nil {
@@ -833,61 +789,9 @@ func (bm Bitmap) String() (s string) {
 	return
 }
 
-/*
- * Context
- */
-var Ctx Context
-
-func (Ctx *Context) IsOpen() bool {
-	return Ctx.ctx != nil
-}
-
-func (Ctx *Context) Open() (err error) {
-	if Ctx.ctx != nil {
-		return
-	}
-
-	Ctx.logger = C.xtl_createlogger_stdiostream(C.stderr, C.XTL_ERROR, 0)
-	if Ctx.logger == nil {
-		err = fmt.Errorf("Cannot open stdiostream")
-		return
-	}
-
-	ret := C.libxl_ctx_alloc(&Ctx.ctx, C.LIBXL_VERSION,
-		0, (*C.xentoollog_logger)(unsafe.Pointer(Ctx.logger)))
-
-	if ret != 0 {
-		err = Error(-ret)
-	}
-	return
-}
-
-func (Ctx *Context) Close() (err error) {
-	ret := C.libxl_ctx_free(Ctx.ctx)
-	Ctx.ctx = nil
-
-	if ret != 0 {
-		err = Error(-ret)
-	}
-	C.xtl_logger_destroy((*C.xentoollog_logger)(unsafe.Pointer(Ctx.logger)))
-	return
-}
-
-func (Ctx *Context) CheckOpen() (err error) {
-	if Ctx.ctx == nil {
-		err = fmt.Errorf("Context not opened")
-	}
-	return
-}
-
 //int libxl_get_max_cpus(libxl_ctx *ctx);
-func (Ctx *Context) GetMaxCpus() (maxCpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_get_max_cpus(Ctx.ctx)
+func (ctx *Context) GetMaxCpus() (maxCpus int, err error) {
+	ret := C.libxl_get_max_cpus(ctx.ctx)
 	if ret < 0 {
 		err = Error(-ret)
 		return
@@ -897,13 +801,8 @@ func (Ctx *Context) GetMaxCpus() (maxCpus int, err error) {
 }
 
 //int libxl_get_online_cpus(libxl_ctx *ctx);
-func (Ctx *Context) GetOnlineCpus() (onCpus int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_get_online_cpus(Ctx.ctx)
+func (ctx *Context) GetOnlineCpus() (onCpus int, err error) {
+	ret := C.libxl_get_online_cpus(ctx.ctx)
 	if ret < 0 {
 		err = Error(-ret)
 		return
@@ -913,12 +812,8 @@ func (Ctx *Context) GetOnlineCpus() (onCpus int, err error) {
 }
 
 //int libxl_get_max_nodes(libxl_ctx *ctx);
-func (Ctx *Context) GetMaxNodes() (maxNodes int, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-	ret := C.libxl_get_max_nodes(Ctx.ctx)
+func (ctx *Context) GetMaxNodes() (maxNodes int, err error) {
+	ret := C.libxl_get_max_nodes(ctx.ctx)
 	if ret < 0 {
 		err = Error(-ret)
 		return
@@ -928,13 +823,9 @@ func (Ctx *Context) GetMaxNodes() (maxNodes int, err error) {
 }
 
 //int libxl_get_free_memory(libxl_ctx *ctx, uint64_t *memkb);
-func (Ctx *Context) GetFreeMemory() (memkb uint64, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
+func (ctx *Context) GetFreeMemory() (memkb uint64, err error) {
 	var cmem C.uint64_t
-	ret := C.libxl_get_free_memory(Ctx.ctx, &cmem)
+	ret := C.libxl_get_free_memory(ctx.ctx, &cmem)
 
 	if ret < 0 {
 		err = Error(-ret)
@@ -947,71 +838,35 @@ func (Ctx *Context) GetFreeMemory() (memkb uint64, err error) {
 }
 
 //int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
-func (Ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
+func (ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
 	var cphys C.libxl_physinfo
 	C.libxl_physinfo_init(&cphys)
 	defer C.libxl_physinfo_dispose(&cphys)
 
-	ret := C.libxl_get_physinfo(Ctx.ctx, &cphys)
+	ret := C.libxl_get_physinfo(ctx.ctx, &cphys)
 
 	if ret < 0 {
 		err = Error(ret)
 		return
 	}
-	physinfo = cphys.toGo()
+	err = physinfo.fromC(&cphys)
 
 	return
 }
 
 //const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
-func (Ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
 	var cinfo *C.libxl_version_info
 
-	cinfo = C.libxl_get_version_info(Ctx.ctx)
+	cinfo = C.libxl_get_version_info(ctx.ctx)
 
-	info = cinfo.toGo()
-
-	return
-}
-
-func (Ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	var cdi C.libxl_dominfo
-	C.libxl_dominfo_init(&cdi)
-	defer C.libxl_dominfo_dispose(&cdi)
-
-	ret := C.libxl_domain_info(Ctx.ctx, &cdi, C.uint32_t(Id))
-
-	if ret != 0 {
-		err = Error(-ret)
-		return
-	}
-
-	di = cdi.toGo()
+	err = info.fromC(cinfo)
 
 	return
 }
 
-func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_domain_unpause(Ctx.ctx, C.uint32_t(Id))
+func (ctx *Context) DomainUnpause(Id Domid) (err error) {
+	ret := C.libxl_domain_unpause(ctx.ctx, C.uint32_t(Id))
 
 	if ret != 0 {
 		err = Error(-ret)
@@ -1020,13 +875,8 @@ func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
 }
 
 //int libxl_domain_pause(libxl_ctx *ctx, uint32_t domain);
-func (Ctx *Context) DomainPause(id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_domain_pause(Ctx.ctx, C.uint32_t(id))
+func (ctx *Context) DomainPause(id Domid) (err error) {
+	ret := C.libxl_domain_pause(ctx.ctx, C.uint32_t(id))
 
 	if ret != 0 {
 		err = Error(-ret)
@@ -1035,13 +885,8 @@ func (Ctx *Context) DomainPause(id Domid) (err error) {
 }
 
 //int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid);
-func (Ctx *Context) DomainShutdown(id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_domain_shutdown(Ctx.ctx, C.uint32_t(id))
+func (ctx *Context) DomainShutdown(id Domid) (err error) {
+	ret := C.libxl_domain_shutdown(ctx.ctx, C.uint32_t(id))
 
 	if ret != 0 {
 		err = Error(-ret)
@@ -1050,13 +895,8 @@ func (Ctx *Context) DomainShutdown(id Domid) (err error) {
 }
 
 //int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid);
-func (Ctx *Context) DomainReboot(id Domid) (err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
-	ret := C.libxl_domain_reboot(Ctx.ctx, C.uint32_t(id))
+func (ctx *Context) DomainReboot(id Domid) (err error) {
+	ret := C.libxl_domain_reboot(ctx.ctx, C.uint32_t(id))
 
 	if ret != 0 {
 		err = Error(-ret)
@@ -1066,14 +906,9 @@ func (Ctx *Context) DomainReboot(id Domid) (err error) {
 
 //libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain_out);
 //void libxl_dominfo_list_free(libxl_dominfo *list, int nb_domain);
-func (Ctx *Context) ListDomain() (glist []Dominfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) ListDomain() (glist []Dominfo, err error) {
 	var nbDomain C.int
-	clist := C.libxl_list_domain(Ctx.ctx, &nbDomain)
+	clist := C.libxl_list_domain(ctx.ctx, &nbDomain)
 	defer C.libxl_dominfo_list_free(clist, nbDomain)
 
 	if int(nbDomain) == 0 {
@@ -1082,33 +917,13 @@ func (Ctx *Context) ListDomain() (glist []Dominfo) {
 
 	gslice := (*[1 << 30]C.libxl_dominfo)(unsafe.Pointer(clist))[:nbDomain:nbDomain]
 	for i := range gslice {
-		info := gslice[i].toGo()
-		glist = append(glist, *info)
+		var di Dominfo
+		err = di.fromC(&gslice[i])
+		if err != nil {
+			return
+		}
+		glist = append(glist, di)
 	}
-
-	return
-}
-
-type Vcpuinfo struct {
-	Vcpuid     uint32
-	Cpu        uint32
-	Online     bool
-	Blocked    bool
-	Running    bool
-	VCpuTime   time.Duration
-	Cpumap     Bitmap
-	CpumapSoft Bitmap
-}
-
-func (cvci C.libxl_vcpuinfo) toGo() (gvci Vcpuinfo) {
-	gvci.Vcpuid = uint32(cvci.vcpuid)
-	gvci.Cpu = uint32(cvci.cpu)
-	gvci.Online = bool(cvci.online)
-	gvci.Blocked = bool(cvci.blocked)
-	gvci.Running = bool(cvci.running)
-	gvci.VCpuTime = time.Duration(cvci.vcpu_time)
-	gvci.Cpumap = cvci.cpumap.toGo()
-	gvci.CpumapSoft = cvci.cpumap_soft.toGo()
 
 	return
 }
@@ -1116,16 +931,11 @@ func (cvci C.libxl_vcpuinfo) toGo() (gvci Vcpuinfo) {
 //libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
 //				int *nb_vcpu, int *nr_cpus_out);
 //void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
-func (Ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
-	err := Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo, err error) {
 	var nbVcpu C.int
 	var nrCpu C.int
 
-	clist := C.libxl_list_vcpu(Ctx.ctx, C.uint32_t(id), &nbVcpu, &nrCpu)
+	clist := C.libxl_list_vcpu(ctx.ctx, C.uint32_t(id), &nbVcpu, &nrCpu)
 	defer C.libxl_vcpuinfo_list_free(clist, nbVcpu)
 
 	if int(nbVcpu) == 0 {
@@ -1134,38 +944,22 @@ func (Ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
 
 	gslice := (*[1 << 30]C.libxl_vcpuinfo)(unsafe.Pointer(clist))[:nbVcpu:nbVcpu]
 	for i := range gslice {
-		info := gslice[i].toGo()
-		glist = append(glist, info)
+		var vi Vcpuinfo
+		err = vi.fromC(&gslice[i])
+		if err != nil {
+			return
+		}
+		glist = append(glist, vi)
 	}
-
-	return
-}
-
-type ConsoleType int
-
-const (
-	ConsoleTypeUnknown = ConsoleType(C.LIBXL_CONSOLE_TYPE_UNKNOWN)
-	ConsoleTypeSerial  = ConsoleType(C.LIBXL_CONSOLE_TYPE_SERIAL)
-	ConsoleTypePV      = ConsoleType(C.LIBXL_CONSOLE_TYPE_PV)
-)
-
-func (ct ConsoleType) String() (str string) {
-	cstr := C.libxl_console_type_to_string(C.libxl_console_type(ct))
-	str = C.GoString(cstr)
 
 	return
 }
 
 //int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
 //libxl_console_type type, char **path);
-func (Ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (path string, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (path string, err error) {
 	var cpath *C.char
-	ret := C.libxl_console_get_tty(Ctx.ctx, C.uint32_t(id), C.int(consNum), C.libxl_console_type(conType), &cpath)
+	ret := C.libxl_console_get_tty(ctx.ctx, C.uint32_t(id), C.int(consNum), C.libxl_console_type(conType), &cpath)
 	if ret != 0 {
 		err = Error(-ret)
 		return
@@ -1178,14 +972,9 @@ func (Ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (p
 
 //int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm,
 //					char **path);
-func (Ctx *Context) PrimaryConsoleGetTty(domid uint32) (path string, err error) {
-	err = Ctx.CheckOpen()
-	if err != nil {
-		return
-	}
-
+func (ctx *Context) PrimaryConsoleGetTty(domid uint32) (path string, err error) {
 	var cpath *C.char
-	ret := C.libxl_primary_console_get_tty(Ctx.ctx, C.uint32_t(domid), &cpath)
+	ret := C.libxl_primary_console_get_tty(ctx.ctx, C.uint32_t(domid), &cpath)
 	if ret != 0 {
 		err = Error(-ret)
 		return
