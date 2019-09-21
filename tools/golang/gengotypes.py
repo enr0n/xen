@@ -256,6 +256,15 @@ def xenlight_golang_generate_helpers(path = None, types = None):
 
             del helper_extras[:]
 
+            f.write(xenlight_golang_define_to_C(ty))
+            f.write('\n')
+
+            for extra in helper_extras:
+                f.write(extra)
+                f.write('\n')
+
+            del helper_extras[:]
+
     go_fmt(path)
 
 def xenlight_golang_define_from_C(ty = None, typename = None, nested = False):
@@ -271,7 +280,7 @@ def xenlight_golang_define_from_C(ty = None, typename = None, nested = False):
         ctypename  = ty.typename
 
     if not nested:
-        s += 'func (x *{}) fromC(c *C.{}) error {{\n'.format(gotypename,ctypename)
+        s += 'func (x *{}) fromC(xc *C.{}) error {{\n'.format(gotypename,ctypename)
 
     for f in ty.fields:
         if f.type.typename is not None:
@@ -307,10 +316,10 @@ def xenlight_golang_define_from_C(ty = None, typename = None, nested = False):
             if is_castable:
                 # Use the cgo helper for converting C strings.
                 if gotypename == 'string':
-                    s += 'x.{} = C.GoString(c.{})\n'.format(goname, cname)
+                    s += 'x.{} = C.GoString(xc.{})\n'.format(goname, cname)
                     continue
 
-                s += 'x.{} = {}(c.{})\n'.format(goname, gotypename, cname)
+                s += 'x.{} = {}(xc.{})\n'.format(goname, gotypename, cname)
 
             else:
                 # If the type is not castable, we need to call its fromC
@@ -319,7 +328,7 @@ def xenlight_golang_define_from_C(ty = None, typename = None, nested = False):
                 varname = xenlight_golang_fmt_name(varname, exported=False)
 
                 s += 'var {} {}\n'.format(varname, gotypename)
-                s += 'if err := {}.fromC(&c.{});'.format(varname, cname)
+                s += 'if err := {}.fromC(&xc.{});'.format(varname, cname)
                 s += 'err != nil {\n return err\n}\n'
                 s += 'x.{} = {}\n'.format(goname, varname)
 
@@ -370,12 +379,12 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
 
         # Define the function here. The cases for keyed unions are a little
         # different.
-        s = 'func (x *{}) fromC(c *C.{}) error {{\n'.format(gotypename,struct_name)
-        s += 'if {}(c.{}) != {} {{\n'.format(gokeytype,cgo_keyname,val)
+        s = 'func (x *{}) fromC(xc *C.{}) error {{\n'.format(gotypename,struct_name)
+        s += 'if {}(xc.{}) != {} {{\n'.format(gokeytype,cgo_keyname,val)
         err_string = '"expected union key {}"'.format(val)
         s += 'return errors.New({})\n'.format(err_string)
         s += '}\n\n'
-        s += 'tmp := (*C.{})(unsafe.Pointer(&c.{}[0]))\n'.format(typename,union_name)
+        s += 'tmp := (*C.{})(unsafe.Pointer(&xc.{}[0]))\n'.format(typename,union_name)
 
         s += xenlight_golang_union_fields_from_C(f.type)
         s += 'return nil\n'
@@ -383,7 +392,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
 
         helper_extras.append(s)
 
-    s = 'x.{} = {}(c.{})\n'.format(gokeyname,gokeytype,cgo_keyname)
+    s = 'x.{} = {}(xc.{})\n'.format(gokeyname,gokeytype,cgo_keyname)
     s += 'switch x.{}{{\n'.format(gokeyname)
 
     # Create switch statement to determine which 'union element'
@@ -397,7 +406,7 @@ def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
         goname = xenlight_golang_fmt_name(goname,exported=False)
 
         s += 'var {} {}\n'.format(goname, gotype)
-        s += 'if err := {}.fromC(c);'.format(goname)
+        s += 'if err := {}.fromC(xc);'.format(goname)
         s += 'err != nil {\n return err \n}\n'
 
         field_name = xenlight_golang_fmt_name('{}_union'.format(keyname))
@@ -454,11 +463,11 @@ def xenlight_golang_array_from_C(ty = None):
     cname      = ty.name
     cslice     = 'c{}'.format(goname)
     clenvar    = ty.type.lenvar.name
-    golenvar   = 'len{}'.format(goname)
+    golenvar   = xenlight_golang_fmt_name(clenvar,exported=False)
 
-    s += '{} := int(c.{})\n'.format(golenvar, clenvar)
+    s += '{} := int(xc.{})\n'.format(golenvar, clenvar)
     s += '{} := '.format(cslice)
-    s +='(*[1<<28]C.{})(unsafe.Pointer(c.{}))[:{}:{}]\n'.format(ctypename, cname,
+    s +='(*[1<<28]C.{})(unsafe.Pointer(xc.{}))[:{}:{}]\n'.format(ctypename, cname,
                                                                 golenvar, golenvar)
     s += 'x.{} = make([]{}, {})\n'.format(goname, gotypename, golenvar)
     s += 'for i, v := range {} {{\n'.format(cslice)
@@ -472,6 +481,198 @@ def xenlight_golang_array_from_C(ty = None):
         s += 'return err }\n'
         s += 'x.{}[i] = e\n'.format(goname)
 
+    s += '}\n'
+
+    return s
+
+def xenlight_golang_define_to_C(ty = None, typename = None, nested = False):
+    s = ''
+
+    gotypename = ctypename = ''
+
+    if typename is not None:
+        gotypename = xenlight_golang_fmt_name(typename)
+        ctypename  = typename
+    else:
+        gotypename = xenlight_golang_fmt_name(ty.typename)
+        ctypename  = ty.typename
+
+    if not nested:
+        s += 'func (x *{}) toC() (xc C.{},err error) {{\n'.format(gotypename,ctypename)
+        s += 'C.{}(&xc)\n'.format(ty.init_fn)
+
+    for f in ty.fields:
+        if f.type.typename is not None:
+            if isinstance(f.type, idl.Array):
+                s += xenlight_golang_array_to_C(f, ty.dispose_fn)
+                continue
+
+            gotypename = xenlight_golang_fmt_name(f.type.typename)
+            ctypename  = f.type.typename
+            gofname    = xenlight_golang_fmt_name(f.name)
+            cfname     = f.name
+
+            # In cgo, C names that conflict with Go keywords can be
+            # accessed by prepending an underscore to the name.
+            if cfname in go_keywords:
+                cfname = '_' + cfname
+
+            # If this is nested, we need the outer name too.
+            if nested and typename is not None:
+                goname = xenlight_golang_fmt_name(typename)
+                goname = '{}.{}'.format(goname, gofname)
+                cname  = '{}.{}'.format(typename, cfname)
+
+            else:
+                goname = gofname
+                cname  = cfname
+
+            is_castable = (f.type.json_parse_type == 'JSON_INTEGER' or
+                           isinstance(f.type, idl.Enumeration) or
+                           gotypename in go_builtin_types)
+
+            if is_castable:
+                # Use the cgo helper for converting C strings.
+                if gotypename == 'string':
+                    s += 'xc.{} = C.CString(x.{})\n'.format(cname,goname)
+                    continue
+
+                s += 'xc.{} = C.{}(x.{})\n'.format(cname,ctypename,goname)
+
+            else:
+                s += 'xc.{}, err = x.{}.toC()\n'.format(cname,goname)
+                s += 'if err != nil {\n'
+                s += 'C.{}(&xc)\n'.format(ty.dispose_fn)
+                s += 'return xc, err\n'
+                s += '}\n'
+
+        elif isinstance(f.type, idl.Struct):
+            s += xenlight_golang_define_to_C(f.type, typename=f.name, nested=True)
+
+        elif isinstance(f.type, idl.KeyedUnion):
+            s += xenlight_golang_union_to_C(f.type, f.name, ty.typename, ty.dispose_fn)
+
+        else:
+            raise Exception('type {} not supported'.format(f.type))
+
+    if not nested:
+        s += 'return xc, nil'
+        s += '}\n'
+
+    return s
+
+def xenlight_golang_union_to_C(ty = None, union_name = '',
+                               struct_name = '', dispose_fn = ''):
+    keyname   = ty.keyvar.name
+    gokeyname = xenlight_golang_fmt_name(keyname)
+    keytype   = ty.keyvar.type.typename
+    gokeytype = xenlight_golang_fmt_name(keytype)
+
+    interface_name = '{}_{}_union'.format(struct_name, keyname)
+    interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
+
+    cgo_keyname = keyname
+    if cgo_keyname in go_keywords:
+        cgo_keyname = '_' + cgo_keyname
+
+
+    s = 'xc.{} = C.{}(x.{})\n'.format(cgo_keyname,keytype,gokeyname)
+    s += 'switch x.{}{{\n'.format(gokeyname)
+
+    # Create switch statement to determine how to populate the C union.
+    for f in ty.fields:
+        key_val = '{}_{}'.format(keytype, f.name)
+        key_val = xenlight_golang_fmt_name(key_val)
+        if f.type is None:
+            continue
+
+        s += 'case {}:\n'.format(key_val)
+        cgotype = '{}_{}_union_{}'.format(struct_name,keyname,f.name)
+        gotype  = xenlight_golang_fmt_name(cgotype)
+        goname  = '{}_{}'.format(keyname,f.name)
+        goname  = xenlight_golang_fmt_name(goname,exported=False)
+
+        field_name = xenlight_golang_fmt_name('{}_union'.format(keyname))
+        s += 'tmp, ok := x.{}.({})\n'.format(field_name,gotype)
+        s += 'if !ok {\n'
+        s += 'C.{}(&xc)\n'.format(dispose_fn)
+        s += 'return xc,errors.New("wrong type for union key {}")\n'.format(keyname)
+        s += '}\n'
+
+        s += 'var {} C.{}\n'.format(f.name,cgotype)
+        for uf in f.type.fields:
+            gotypename = xenlight_golang_fmt_name(uf.type.typename)
+            ctypename  = uf.type.typename
+            gofname    = xenlight_golang_fmt_name(uf.name)
+
+            is_castable = (uf.type.json_parse_type == 'JSON_INTEGER' or
+                           isinstance(uf.type, idl.Enumeration) or
+                           gotypename in go_builtin_types)
+
+            if not is_castable:
+                s += '{}.{}, err = tmp.{}.toC()\n'.format(f.name,uf.name,gofname)
+                s += 'if err != nil {\n'
+                s += 'C.{}(&xc)\n'.format(dispose_fn)
+                s += 'return xc,err \n}\n'
+
+            elif gotypename == 'string':
+                s += '{}.{} = C.CString(tmp.{})\n'.format(f.name,uf.name,gofname)
+
+            else:
+                s += '{}.{} = C.{}(tmp.{})\n'.format(f.name,uf.name,ctypename,gofname)
+
+        # The union is still represented as Go []byte.
+        s += '{}Bytes := C.GoBytes(unsafe.Pointer(&{}),C.sizeof_{})\n'.format(f.name,
+                                                                              f.name,
+                                                                              cgotype)
+        s += 'copy(xc.{}[:],{}Bytes)\n'.format(union_name,f.name)
+
+    # End switch statement
+    s += 'default:\n'
+    err_string = '"invalid union key \'%v\'", x.{}'.format(gokeyname)
+    s += 'return xc, fmt.Errorf({})'.format(err_string)
+    s += '}\n'
+
+    return s
+
+def xenlight_golang_array_to_C(ty = None, dispose_fn = ''):
+    s = ''
+
+    gotypename = xenlight_golang_fmt_name(ty.type.elem_type.typename)
+    goname     = xenlight_golang_fmt_name(ty.name)
+    ctypename  = ty.type.elem_type.typename
+    cname      = ty.name
+    clenvar    = ty.type.lenvar.name
+    golenvar   = xenlight_golang_fmt_name(clenvar,exported=False)
+
+    is_enum = isinstance(ty.type.elem_type,idl.Enumeration)
+    if gotypename in go_builtin_types or is_enum:
+        s += '{} := len(x.{})\n'.format(golenvar,goname)
+        s += 'xc.{} = (*C.{})(C.malloc(C.size_t({}*{})))\n'.format(cname,ctypename,
+                                                                   golenvar,golenvar)
+        s += 'xc.{} = C.int({})\n'.format(clenvar,golenvar)
+        s += 'c{} := (*[1<<28]C.{})(unsafe.Pointer(xc.{}))[:{}:{}]\n'.format(goname,
+                                                                      ctypename,cname,
+                                                                      golenvar,golenvar)
+        s += 'for i,v := range x.{} {{\n'.format(goname)
+        s += 'c{}[i] = C.{}(v)\n'.format(goname,ctypename)
+        s += '}\n'
+
+        return s
+
+    s += '{} := len(x.{})\n'.format(golenvar,goname)
+    s += 'xc.{} = (*C.{})(C.malloc(C.ulong({})*C.sizeof_{}))\n'.format(cname,ctypename,
+                                                                   golenvar,ctypename)
+    s += 'xc.{} = C.int({})\n'.format(clenvar,golenvar)
+    s += 'c{} := (*[1<<28]C.{})(unsafe.Pointer(xc.{}))[:{}:{}]\n'.format(goname,
+                                                                         ctypename,cname,
+                                                                         golenvar,golenvar)
+    s += 'for i,v := range x.{} {{\n'.format(goname)
+    s += 'tmp, err := v.toC()\n'
+    s += 'if err != nil {\n'
+    s += 'C.{}(&xc)\n'.format(dispose_fn)
+    s += 'return xc,err\n}\n'
+    s += 'c{}[i] = tmp\n'.format(goname)
     s += '}\n'
 
     return s
