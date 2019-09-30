@@ -183,18 +183,46 @@ func (hwcap *Hwcap) toC() (C.libxl_hwcap, error) {
 	return chwcap, nil
 }
 
-// typedef struct {
-//     uint32_t size;          /* number of bytes in map */
-//     uint8_t *map;
-// } libxl_bitmap;
-
+// Bitmap represents a libxl_bitmap.
+//
 // Implement the Go bitmap type such that the underlying data can
 // easily be copied in and out.  NB that we still have to do copies
 // both directions, because cgo runtime restrictions forbid passing to
 // a C function a pointer to a Go-allocated structure which contains a
 // pointer.
 type Bitmap struct {
+	// typedef struct {
+	//     uint32_t size;          /* number of bytes in map */
+	//     uint8_t *map;
+	// } libxl_bitmap;
 	bitmap []C.uint8_t
+}
+
+func (bm *Bitmap) fromC(cbm *C.libxl_bitmap) error {
+	// Alloc a Go slice for the bytes
+	size := int(cbm.size)
+	bm.bitmap = make([]C.uint8_t, size)
+
+	// Make a slice pointing to the C array
+	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
+
+	// And copy the C array into the Go array
+	copy(bm.bitmap, mapslice)
+
+	return nil
+}
+
+func (bm *Bitmap) toC() (C.libxl_bitmap, error) {
+	var cbm C.libxl_bitmap
+
+	size := len(bm.bitmap)
+	cbm.size = C.uint32_t(size)
+	cbm._map = (*C.uint8_t)(C.malloc(C.ulong(cbm.size) * C.sizeof_uint8_t))
+	cslice := (*[1 << 31]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
+
+	copy(cslice, bm.bitmap)
+
+	return cbm, nil
 }
 
 /*
@@ -725,41 +753,6 @@ func (Ctx *Context) CpupoolMakeFree(Cpumap Bitmap) (err error) {
 /*
  * Bitmap operations
  */
-
-// Return a Go bitmap which is a copy of the referred C bitmap.
-func (cbm C.libxl_bitmap) toGo() (gbm Bitmap) {
-	// Alloc a Go slice for the bytes
-	size := int(cbm.size)
-	gbm.bitmap = make([]C.uint8_t, size)
-
-	// Make a slice pointing to the C array
-	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
-
-	// And copy the C array into the Go array
-	copy(gbm.bitmap, mapslice)
-
-	return
-}
-
-// Must be C.libxl_bitmap_dispose'd of afterwards
-func (gbm Bitmap) toC() (cbm C.libxl_bitmap) {
-	C.libxl_bitmap_init(&cbm)
-
-	size := len(gbm.bitmap)
-	cbm._map = (*C.uint8_t)(C.malloc(C.size_t(size)))
-	cbm.size = C.uint32_t(size)
-	if cbm._map == nil {
-		panic("C.calloc failed!")
-	}
-
-	// Make a slice pointing to the C array
-	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
-
-	// And copy the Go array into the C array
-	copy(mapslice, gbm.bitmap)
-
-	return
-}
 
 func (bm *Bitmap) Test(bit int) bool {
 	ubit := uint(bit)
