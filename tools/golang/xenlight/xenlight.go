@@ -118,7 +118,40 @@ type Domid uint32
 
 type MemKB uint64
 
-type Uuid C.libxl_uuid
+// Uuid is a domain UUID.
+type Uuid [16]byte
+
+// String formats a Uuid in the form "xxxx-xx-xx-xx-xxxxxx".
+func (u Uuid) String() string {
+	s := "%x%x%x%x-%x%x-%x%x-%x%x-%x%x%x%x%x%x"
+	opts := make([]interface{}, 16)
+
+	for i, v := range u {
+		opts[i] = v
+	}
+
+	return fmt.Sprintf(s, opts...)
+}
+
+func (u *Uuid) fromC(c *C.libxl_uuid) error {
+	b := (*[16]C.uint8_t)(unsafe.Pointer(&c.uuid[0]))
+
+	for i, v := range b {
+		u[i] = byte(v)
+	}
+
+	return nil
+}
+
+func (u *Uuid) toC() (C.libxl_uuid, error) {
+	var c C.libxl_uuid
+
+	for i, v := range u {
+		c.uuid[i] = C.uint8_t(v)
+	}
+
+	return c, nil
+}
 
 type Context struct {
 	ctx    *C.libxl_ctx
