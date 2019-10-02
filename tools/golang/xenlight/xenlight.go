@@ -463,47 +463,6 @@ func (bm *Bitmap) toC() (C.libxl_bitmap, error) {
 	return cbm, nil
 }
 
-func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
-
-	physinfo = &Physinfo{}
-	physinfo.ThreadsPerCore = uint32(cphys.threads_per_core)
-	physinfo.CoresPerSocket = uint32(cphys.cores_per_socket)
-	physinfo.MaxCpuId = uint32(cphys.max_cpu_id)
-	physinfo.NrCpus = uint32(cphys.nr_cpus)
-	physinfo.CpuKhz = uint32(cphys.cpu_khz)
-	physinfo.TotalPages = uint64(cphys.total_pages)
-	physinfo.FreePages = uint64(cphys.free_pages)
-	physinfo.ScrubPages = uint64(cphys.scrub_pages)
-	physinfo.ScrubPages = uint64(cphys.scrub_pages)
-	physinfo.SharingFreedPages = uint64(cphys.sharing_freed_pages)
-	physinfo.SharingUsedFrames = uint64(cphys.sharing_used_frames)
-	physinfo.NrNodes = uint32(cphys.nr_nodes)
-	physinfo.HwCap = cphys.hw_cap.toGo()
-	physinfo.CapHvm = bool(cphys.cap_hvm)
-	physinfo.CapHvmDirectio = bool(cphys.cap_hvm_directio)
-
-	return
-}
-
-func (cinfo *C.libxl_version_info) toGo() (info *VersionInfo) {
-	info = &VersionInfo{}
-	info.XenVersionMajor = int(cinfo.xen_version_major)
-	info.XenVersionMinor = int(cinfo.xen_version_minor)
-	info.XenVersionExtra = C.GoString(cinfo.xen_version_extra)
-	info.Compiler = C.GoString(cinfo.compiler)
-	info.CompileBy = C.GoString(cinfo.compile_by)
-	info.CompileDomain = C.GoString(cinfo.compile_domain)
-	info.CompileDate = C.GoString(cinfo.compile_date)
-	info.Capabilities = C.GoString(cinfo.capabilities)
-	info.Changeset = C.GoString(cinfo.changeset)
-	info.VirtStart = uint64(cinfo.virt_start)
-	info.Pagesize = int(cinfo.pagesize)
-	info.Commandline = C.GoString(cinfo.commandline)
-	info.BuildId = C.GoString(cinfo.build_id)
-
-	return
-}
-
 func (sr ShutdownReason) String() (str string) {
 	cstr := C.libxl_shutdown_reason_to_string(C.libxl_shutdown_reason(sr))
 	str = C.GoString(cstr)
@@ -514,34 +473,6 @@ func (sr ShutdownReason) String() (str string) {
 func (dt DomainType) String() (str string) {
 	cstr := C.libxl_domain_type_to_string(C.libxl_domain_type(dt))
 	str = C.GoString(cstr)
-
-	return
-}
-
-func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
-
-	di = &Dominfo{}
-	di.Uuid = Uuid(cdi.uuid)
-	di.Domid = Domid(cdi.domid)
-	di.Ssidref = uint32(cdi.ssidref)
-	di.SsidLabel = C.GoString(cdi.ssid_label)
-	di.Running = bool(cdi.running)
-	di.Blocked = bool(cdi.blocked)
-	di.Paused = bool(cdi.paused)
-	di.Shutdown = bool(cdi.shutdown)
-	di.Dying = bool(cdi.dying)
-	di.NeverStop = bool(cdi.never_stop)
-	di.ShutdownReason = int32(cdi.shutdown_reason)
-	di.OutstandingMemkb = MemKB(cdi.outstanding_memkb)
-	di.CurrentMemkb = MemKB(cdi.current_memkb)
-	di.SharedMemkb = MemKB(cdi.shared_memkb)
-	di.PagedMemkb = MemKB(cdi.paged_memkb)
-	di.MaxMemkb = MemKB(cdi.max_memkb)
-	di.CpuTime = time.Duration(cdi.cpu_time)
-	di.VcpuMaxId = uint32(cdi.vcpu_max_id)
-	di.VcpuOnline = uint32(cdi.vcpu_online)
-	di.Cpupool = uint32(cdi.cpupool)
-	di.DomainType = int32(cdi.domain_type)
 
 	return
 }
@@ -573,16 +504,6 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 	}
 
 	s = Scheduler(cs)
-
-	return
-}
-
-func (cci C.libxl_cpupoolinfo) toGo() (gci CpupoolInfo) {
-	gci.Poolid = uint32(cci.poolid)
-	gci.PoolName = C.GoString(cci.pool_name)
-	gci.Scheduler = Scheduler(cci.sched)
-	gci.DomainCount = int(cci.n_dom)
-	gci.Cpumap = cci.cpumap.toGo()
 
 	return
 }
@@ -1072,19 +993,6 @@ func (Ctx *Context) ListDomain() (glist []Dominfo) {
 		info := gslice[i].toGo()
 		glist = append(glist, *info)
 	}
-
-	return
-}
-
-func (cvci C.libxl_vcpuinfo) toGo() (gvci Vcpuinfo) {
-	gvci.Vcpuid = uint32(cvci.vcpuid)
-	gvci.Cpu = uint32(cvci.cpu)
-	gvci.Online = bool(cvci.online)
-	gvci.Blocked = bool(cvci.blocked)
-	gvci.Running = bool(cvci.running)
-	gvci.VCpuTime = time.Duration(cvci.vcpu_time)
-	gvci.Cpumap = cvci.cpumap.toGo()
-	gvci.CpumapSoft = cvci.cpumap_soft.toGo()
 
 	return
 }
