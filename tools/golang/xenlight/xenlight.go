@@ -463,30 +463,6 @@ func (bm *Bitmap) toC() (C.libxl_bitmap, error) {
 	return cbm, nil
 }
 
-/*
- * Types: IDL
- *
- * FIXME: Generate these automatically from the IDL
- */
-
-type Physinfo struct {
-	ThreadsPerCore    uint32
-	CoresPerSocket    uint32
-	MaxCpuId          uint32
-	NrCpus            uint32
-	CpuKhz            uint32
-	TotalPages        uint64
-	FreePages         uint64
-	ScrubPages        uint64
-	OutstandingPages  uint64
-	SharingFreedPages uint64
-	SharingUsedFrames uint64
-	NrNodes           uint32
-	HwCap             Hwcap
-	CapHvm            bool
-	CapHvmDirectio    bool
-}
-
 func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
 
 	physinfo = &Physinfo{}
@@ -507,22 +483,6 @@ func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
 	physinfo.CapHvmDirectio = bool(cphys.cap_hvm_directio)
 
 	return
-}
-
-type VersionInfo struct {
-	XenVersionMajor int
-	XenVersionMinor int
-	XenVersionExtra string
-	Compiler        string
-	CompileBy       string
-	CompileDomain   string
-	CompileDate     string
-	Capabilities    string
-	Changeset       string
-	VirtStart       uint64
-	Pagesize        int
-	Commandline     string
-	BuildId         string
 }
 
 func (cinfo *C.libxl_version_info) toGo() (info *VersionInfo) {
@@ -556,31 +516,6 @@ func (dt DomainType) String() (str string) {
 	str = C.GoString(cstr)
 
 	return
-}
-
-type Dominfo struct {
-	Uuid      Uuid
-	Domid     Domid
-	Ssidref   uint32
-	SsidLabel string
-	Running   bool
-	Blocked   bool
-	Paused    bool
-	Shutdown  bool
-	Dying     bool
-	NeverStop bool
-
-	ShutdownReason   int32
-	OutstandingMemkb MemKB
-	CurrentMemkb     MemKB
-	SharedMemkb      MemKB
-	PagedMemkb       MemKB
-	MaxMemkb         MemKB
-	CpuTime          time.Duration
-	VcpuMaxId        uint32
-	VcpuOnline       uint32
-	Cpupool          uint32
-	DomainType       int32
 }
 
 func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
@@ -640,22 +575,6 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 	s = Scheduler(cs)
 
 	return
-}
-
-// libxl_cpupoolinfo = Struct("cpupoolinfo", [
-//     ("poolid",      uint32),
-//     ("pool_name",   string),
-//     ("sched",       libxl_scheduler),
-//     ("n_dom",       uint32),
-//     ("cpumap",      libxl_bitmap)
-//     ], dir=DIR_OUT)
-
-type CpupoolInfo struct {
-	Poolid      uint32
-	PoolName    string
-	Scheduler   Scheduler
-	DomainCount int
-	Cpumap      Bitmap
 }
 
 func (cci C.libxl_cpupoolinfo) toGo() (gci CpupoolInfo) {
@@ -1155,17 +1074,6 @@ func (Ctx *Context) ListDomain() (glist []Dominfo) {
 	}
 
 	return
-}
-
-type Vcpuinfo struct {
-	Vcpuid     uint32
-	Cpu        uint32
-	Online     bool
-	Blocked    bool
-	Running    bool
-	VCpuTime   time.Duration
-	Cpumap     Bitmap
-	CpumapSoft Bitmap
 }
 
 func (cvci C.libxl_vcpuinfo) toGo() (gvci Vcpuinfo) {
