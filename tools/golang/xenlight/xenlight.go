@@ -532,7 +532,7 @@ func (Ctx *Context) ListCpupool() (list []Cpupoolinfo) {
 }
 
 // int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
-func (Ctx *Context) Cpupoolinfo(Poolid uint32) (pool Cpupoolinfo) {
+func (Ctx *Context) Cpupoolinfo(Poolid uint32) (pool Cpupoolinfo, err error) {
 	var c_cpupool C.libxl_cpupoolinfo
 
 	ret := C.libxl_cpupool_info(Ctx.ctx, &c_cpupool, C.uint32_t(Poolid))
@@ -542,7 +542,7 @@ func (Ctx *Context) Cpupoolinfo(Poolid uint32) (pool Cpupoolinfo) {
 	}
 	defer C.libxl_cpupoolinfo_dispose(&c_cpupool)
 
-	_ = pool.fromC(&c_cpupool)
+	err = pool.fromC(&c_cpupool)
 
 	return
 }
