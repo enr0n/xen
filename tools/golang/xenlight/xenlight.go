@@ -948,7 +948,7 @@ func (Ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
 }
 
 func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
-	ret := C.libxl_domain_unpause(Ctx.ctx, C.uint32_t(Id))
+	ret := C.libxl_domain_unpause(Ctx.ctx, C.uint32_t(Id), nil)
 
 	if ret != 0 {
 		err = Error(-ret)
@@ -958,7 +958,7 @@ func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
 
 //int libxl_domain_pause(libxl_ctx *ctx, uint32_t domain);
 func (Ctx *Context) DomainPause(id Domid) (err error) {
-	ret := C.libxl_domain_pause(Ctx.ctx, C.uint32_t(id))
+	ret := C.libxl_domain_pause(Ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
 		err = Error(-ret)
