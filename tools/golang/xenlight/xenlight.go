@@ -524,7 +524,8 @@ func (Ctx *Context) ListCpupool() (list []Cpupoolinfo) {
 	// Magic
 	cpupoolListSlice := (*[1 << 30]C.libxl_cpupoolinfo)(unsafe.Pointer(c_cpupool_list))[:nbPool:nbPool]
 	for i := range cpupoolListSlice {
-		info := cpupoolListSlice[i].toGo()
+		var info Cpupoolinfo
+		_ = info.fromC(&cpupoolListSlice[i])
 		list = append(list, info)
 	}
 
@@ -542,7 +543,7 @@ func (Ctx *Context) Cpupoolinfo(Poolid uint32) (pool Cpupoolinfo) {
 	}
 	defer C.libxl_cpupoolinfo_dispose(&c_cpupool)
 
-	pool = c_cpupool.toGo()
+	_ = pool.fromC(&c_cpupool)
 
 	return
 }
@@ -914,7 +915,7 @@ func (Ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
 		err = Error(ret)
 		return
 	}
-	physinfo = cphys.toGo()
+	err = physinfo.fromC(&cphys)
 
 	return
 }
@@ -925,7 +926,7 @@ func (Ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
 
 	cinfo = C.libxl_get_version_info(Ctx.ctx)
 
-	info = cinfo.toGo()
+	err = info.fromC(cinfo)
 
 	return
 }
@@ -942,7 +943,7 @@ func (Ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
 		return
 	}
 
-	di = cdi.toGo()
+	err = di.fromC(&cdi)
 
 	return
 }
@@ -999,8 +1000,9 @@ func (Ctx *Context) ListDomain() (glist []Dominfo) {
 
 	gslice := (*[1 << 30]C.libxl_dominfo)(unsafe.Pointer(clist))[:nbDomain:nbDomain]
 	for i := range gslice {
-		info := gslice[i].toGo()
-		glist = append(glist, *info)
+		var info Dominfo
+		_ = info.fromC(&gslice[i])
+		glist = append(glist, info)
 	}
 
 	return
@@ -1022,7 +1024,8 @@ func (Ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
 
 	gslice := (*[1 << 30]C.libxl_vcpuinfo)(unsafe.Pointer(clist))[:nbVcpu:nbVcpu]
 	for i := range gslice {
-		info := gslice[i].toGo()
+		var info Vcpuinfo
+		_ = info.fromC(&gslice[i])
 		glist = append(glist, info)
 	}
 
