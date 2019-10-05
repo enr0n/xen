@@ -510,7 +510,7 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 
 // libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool_out);
 // void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nb_pool);
-func (Ctx *Context) ListCpupool() (list []CpupoolInfo) {
+func (Ctx *Context) ListCpupool() (list []Cpupoolinfo) {
 	var nbPool C.int
 
 	c_cpupool_list := C.libxl_list_cpupool(Ctx.ctx, &nbPool)
@@ -532,7 +532,7 @@ func (Ctx *Context) ListCpupool() (list []CpupoolInfo) {
 }
 
 // int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
-func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool CpupoolInfo) {
+func (Ctx *Context) Cpupoolinfo(Poolid uint32) (pool Cpupoolinfo) {
 	var c_cpupool C.libxl_cpupoolinfo
 
 	ret := C.libxl_cpupool_info(Ctx.ctx, &c_cpupool, C.uint32_t(Poolid))
@@ -698,7 +698,7 @@ func (Ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
 //
 // Utility functions
 //
-func (Ctx *Context) CpupoolFindByName(name string) (info CpupoolInfo, found bool) {
+func (Ctx *Context) CpupoolFindByName(name string) (info Cpupoolinfo, found bool) {
 	plist := Ctx.ListCpupool()
 
 	for i := range plist {
