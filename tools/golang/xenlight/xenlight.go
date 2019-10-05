@@ -33,7 +33,6 @@ import "C"
 
 import (
 	"fmt"
-	"time"
 	"unsafe"
 )
 
