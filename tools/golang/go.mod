@@ -1,1 +1,1 @@
-module enr0n.net/x
+module enr0n.net/x/tools/golang
